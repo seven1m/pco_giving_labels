@@ -1,0 +1,16 @@
+personal_access_token:
+  app_id: abc123abc123abc123abc123abc123abc123abc123abc123abc123abc123abc123
+  secret: xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789
+
+login:
+  user_id: 1111111
+  email: user@example.com
+  password: user-password
+
+apply_labels_to_donations:
+  - people_campus: Broken Arrow Campus
+    giving_label: campus-ba
+  - people_campus: Coweta Campus
+    giving_label: campus-coweta
+  - people_campus: Sapulpa Campus
+    giving_label: campus-sapulpa
