@@ -126,5 +126,9 @@ if !File.exist?(config_path)
   exit 1
 end
 
+puts "Applying Giving Labels run #{Time.now.strftime('%Y-%m-%d %I:%M %p')}"
+
 config = YAML.load(File.read(config_path))
 Labeler.new(config).run
+
+puts 'done'
