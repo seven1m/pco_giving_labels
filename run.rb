@@ -26,7 +26,7 @@ class Labeler
         puts "donation #{donation['id']}: already has label #{labels.join(', ')}"
       else
         person_id = donation.dig('relationships', 'person', 'data', 'id')
-        person = get(api.people.v2.people[person_id])
+        person = api.people.v2.people[person_id].get
         campus_id = person.dig('data', 'relationships', 'primary_campus', 'data', 'id')
         unless campus_id
           puts "donation #{donation['id']}: no campus for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}"
@@ -42,13 +42,6 @@ class Labeler
   end
 
   private
-
-  def get(endpoint, **args)
-    endpoint.get(**args)
-  rescue PCO::API::Errors::TooManyRequests
-    sleep 1
-    retry
-  end
 
   # we are not allowed to edit the donation labels via the API for two reasons:
   # - the donation isn't in a batch (sometimes)
@@ -94,7 +87,7 @@ class Labeler
   def each_donation
     offset = 0
     loop do
-      payload = get(api.giving.v2.donations, 'offset' => offset, 'per_page' => 100, 'where[received_at][gt]' => after_date)
+      payload = api.giving.v2.donations.get('offset' => offset, 'per_page' => 100, 'where[received_at][gt]' => after_date)
       payload['data'].each do |donation|
         yield donation
       end
@@ -109,7 +102,7 @@ class Labeler
   end
 
   def giving_labels
-    @giving_labels ||= get(api.giving.v2.labels, per_page: 100)['data'].each_with_object({}) do |label, hash|
+    @giving_labels ||= api.giving.v2.labels.get(per_page: 100)['data'].each_with_object({}) do |label, hash|
       hash[label.fetch('id')] = label
     end
   end
@@ -121,7 +114,7 @@ class Labeler
   end
 
   def people_campuses
-    @people_campuses ||= get(api.people.v2.campuses, per_page: 100)['data'].each_with_object({}) do |campus, hash|
+    @people_campuses ||= api.people.v2.campuses.get(per_page: 100)['data'].each_with_object({}) do |campus, hash|
       hash[campus.fetch('id')] = campus
     end
   end
