@@ -97,8 +97,8 @@ class Labeler
   end
 
   def after_date
-    one_week = 60 * 60 * 24 * 7
-    (Time.now - one_week).utc.strftime('%Y-%m-%dT00:00:00Z')
+    one_month = 60 * 60 * 24 * 30
+    (Time.now - one_month).utc.strftime('%Y-%m-%dT00:00:00Z')
   end
 
   def giving_labels
