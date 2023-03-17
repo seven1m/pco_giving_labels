@@ -21,20 +21,22 @@ class Labeler
     each_donation do |donation|
       labels = donation.dig('relationships', 'labels', 'data')
       label_ids = labels.map { |l| l['id'] }
+      date = donation.dig('attributes', 'created_at').split('T').first
+      log_prefix = "donation #{donation['id']} on #{date}:"
       if (existing_label_ids = (giving_labels.keys & label_ids)).any?
         labels = existing_label_ids.map { |id| giving_labels.fetch(id)['attributes']['slug'] }
-        puts "donation #{donation['id']}: already has label #{labels.join(', ')}"
+        puts "#{log_prefix} already has label #{labels.join(', ')}"
       else
         person_id = donation.dig('relationships', 'person', 'data', 'id')
         person = api.people.v2.people[person_id].get
         campus_id = person.dig('data', 'relationships', 'primary_campus', 'data', 'id')
         unless campus_id
-          puts "donation #{donation['id']}: no campus for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}"
+          puts "#{log_prefix} no campus for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}"
           next
         end
         campus = people_campuses.fetch(campus_id)
         label_slug = label_mappings[campus['attributes'].fetch('name')]
-        puts "donation #{donation['id']}: applying label #{label_slug} for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}..."
+        puts "#{log_prefix} applying label #{label_slug} for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}..."
         label_id = giving_labels_by_slug[label_slug].fetch('id')
         add_label(donation, label_id)
       end
