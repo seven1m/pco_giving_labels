@@ -28,6 +28,10 @@ class Labeler
         puts "#{log_prefix} already has label #{labels.join(', ')}"
       else
         person_id = donation.dig('relationships', 'person', 'data', 'id')
+        unless person_id
+          puts "#{log_prefix} no person linked to donation"
+          next
+        end
         person = api.people.v2.people[person_id].get
         campus_id = person.dig('data', 'relationships', 'primary_campus', 'data', 'id')
         unless campus_id
