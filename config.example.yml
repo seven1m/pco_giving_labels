@@ -2,10 +2,7 @@ personal_access_token:
   app_id: abc123abc123abc123abc123abc123abc123abc123abc123abc123abc123abc123
   secret: xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789xyz789
 
-login:
-  user_id: 1111111
-  email: user@example.com
-  password: user-password
+login_cookie: abc123
 
 apply_labels_to_donations:
   - people_campus: Broken Arrow Campus

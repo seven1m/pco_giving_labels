@@ -1,8 +1,10 @@
 require 'bundler/setup'
-require 'mechanize'
+require 'net/http'
+require 'nokogiri'
 require 'pco_api'
 require 'pry'
 require 'time'
+require 'uri'
 require 'yaml'
 
 class Labeler
@@ -54,34 +56,38 @@ class Labeler
   # - the donation wasn't created via an external payment source
   # ...so we'll do it the hard way ;-)
   def add_label(donation, label_id)
-    agent.post(
-      "https://giving.planningcenteronline.com/donations/#{donation['id']}",
-        {
-          '_method' => 'PATCH',
-          'donation[id]' => donation['id'],
-          'section' => 'labels',
-          'donation[donations_labels_attributes][][label_id]' => label_id,
-        },
-        'X-CSRF-Token' => @csrf_token,
+    uri = URI("https://giving.planningcenteronline.com/donations/#{donation['id']}")
+    http = Net::HTTP.new(uri.hostname, uri.port)
+    http.use_ssl = true
+    request = Net::HTTP::Post.new(uri)
+    request['Cookie'] = "planning_center_session=#{@config['login_cookie']}"
+    request['X-CSRF-Token'] = csrf_token
+    encoded_params = URI.encode_www_form(
+      '_method' => 'PATCH',
+      'donation[id]' => donation['id'],
+      'section' => 'labels',
+      'donation[donations_labels_attributes][][label_id]' => label_id,
     )
+    request.body = encoded_params
+    response = http.request(request)
+    unless response.code == '200'
+      p response
+      p response.body
+      raise 'failed to add label'
+    end
   end
 
-  def agent
-    return @agent if @agent
-    agent = Mechanize.new
-    page = agent.get "https://login.planningcenteronline.com/login/new?ready=true"
-    login_form = page.forms.first
-    login_form.field_with(name: 'login').value = @config['login'].fetch('email')
-    login_form.field_with(name: 'password').value = @config['login'].fetch('password')
-    page = agent.submit(login_form)
-    @csrf_token = page.at_css('meta[name="csrf-token"]').attributes['content'].value
-    url = "/login?user_id=#{@config['login'].fetch('user_id')}"
-    agent.post(
-      url,
-      '_method' => 'PUT',
-      'authenticity_token' => @csrf_token,
-    )
-    @agent = agent
+  def csrf_token
+    return @csrf_token if @csrf_token
+
+    uri = URI('https://giving.planningcenteronline.com/dashboard')
+    http = Net::HTTP.new(uri.hostname, uri.port)
+    http.use_ssl = true
+    request = Net::HTTP::Get.new(uri)
+    request['Cookie'] = "planning_center_session=#{@config['login_cookie']}"
+    response = http.request(request)
+    doc = Nokogiri::HTML(response.body)
+    @csrf_token = doc.at_css('meta[name=csrf-token]')['content']
   end
 
   def label_mappings
