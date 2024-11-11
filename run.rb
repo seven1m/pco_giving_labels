@@ -21,31 +21,35 @@ class Labeler
 
   def run
     each_donation do |donation|
+      next if donation.dig('attributes', 'payment_status') == 'failed'
+
       labels = donation.dig('relationships', 'labels', 'data')
       label_ids = labels.map { |l| l['id'] }
       date = donation.dig('attributes', 'created_at').split('T').first
       log_prefix = "donation #{donation['id']} on #{date}:"
+
       if (existing_label_ids = (giving_labels.keys & label_ids)).any?
         labels = existing_label_ids.map { |id| giving_labels.fetch(id)['attributes']['slug'] }
         puts "#{log_prefix} already has label #{labels.join(', ')}"
-      else
-        person_id = donation.dig('relationships', 'person', 'data', 'id')
-        unless person_id
-          puts "#{log_prefix} no person linked to donation"
-          next
-        end
-        person = api.people.v2.people[person_id].get
-        campus_id = person.dig('data', 'relationships', 'primary_campus', 'data', 'id')
-        unless campus_id
-          puts "#{log_prefix} no campus for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}"
-          next
-        end
-        campus = people_campuses.fetch(campus_id)
-        label_slug = label_mappings[campus['attributes'].fetch('name')]
-        puts "#{log_prefix} applying label #{label_slug} for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}..."
-        label_id = giving_labels_by_slug[label_slug].fetch('id')
-        add_label(donation, label_id)
+        next
       end
+
+      person_id = donation.dig('relationships', 'person', 'data', 'id')
+      unless person_id
+        puts "#{log_prefix} no person linked to donation"
+        next
+      end
+      person = api.people.v2.people[person_id].get
+      campus_id = person.dig('data', 'relationships', 'primary_campus', 'data', 'id')
+      unless campus_id
+        puts "#{log_prefix} no campus for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}"
+        next
+      end
+      campus = people_campuses.fetch(campus_id)
+      label_slug = label_mappings[campus['attributes'].fetch('name')]
+      puts "#{log_prefix} applying label #{label_slug} for #{person['data']['attributes']['first_name']} #{person['data']['attributes']['last_name']}..."
+      label_id = giving_labels_by_slug[label_slug].fetch('id')
+      add_label(donation, label_id)
     end
   end
 
@@ -60,19 +64,19 @@ class Labeler
     http = Net::HTTP.new(uri.hostname, uri.port)
     http.use_ssl = true
     request = Net::HTTP::Post.new(uri)
-    request['Cookie'] = "planning_center_session=#{@config['login_cookie']}"
+    request['Cookie'] = "planning_center_session=#{@config['login']['cookie']}"
     request['X-CSRF-Token'] = csrf_token
     encoded_params = URI.encode_www_form(
-      '_method' => 'PATCH',
+      '_method' => 'patch',
       'donation[id]' => donation['id'],
       'section' => 'labels',
+      'donation[donations_labels_attributes][][id]' => '',
       'donation[donations_labels_attributes][][label_id]' => label_id,
     )
     request.body = encoded_params
     response = http.request(request)
     unless response.code == '200'
-      p response
-      p response.body
+      p(csrf_token:, encoded_params:, response:, location: response['Location'])
       raise 'failed to add label'
     end
   end
@@ -84,8 +88,13 @@ class Labeler
     http = Net::HTTP.new(uri.hostname, uri.port)
     http.use_ssl = true
     request = Net::HTTP::Get.new(uri)
-    request['Cookie'] = "planning_center_session=#{@config['login_cookie']}"
+    request['Cookie'] = "planning_center_session=#{@config['login']['cookie']}"
     response = http.request(request)
+    if response['Location']
+      puts response['Location']
+      puts response.body
+      exit 1
+    end
     doc = Nokogiri::HTML(response.body)
     @csrf_token = doc.at_css('meta[name=csrf-token]')['content']
   end
